@@ -1,4 +1,5 @@
 import copy
+from typing import Any, List, Optional
 
 import click
 import fmf
@@ -6,7 +7,7 @@ import fmf
 import tmt
 
 
-class Finish(tmt.steps.Step):
+class Finish(tmt.steps.Step):  # type: ignore[misc]
     """
     Perform the finishing tasks and clean up provisioned guests.
 
@@ -19,7 +20,7 @@ class Finish(tmt.steps.Step):
     successful) so that provisioned systems are not kept running.
     """
 
-    def wake(self):
+    def wake(self) -> None:
         """ Wake up the step (process workdir and command line) """
         super().wake()
 
@@ -40,17 +41,17 @@ class Finish(tmt.steps.Step):
             self.status('todo')
             self.save()
 
-    def show(self):
+    def show(self) -> None:
         """ Show finish details """
         for data in self.data:
             FinishPlugin.delegate(self, data).show()
 
-    def summary(self):
+    def summary(self) -> None:
         """ Give a concise summary """
         tasks = fmf.utils.listed(self.phases(), 'task')
         self.info('summary', f'{tasks} completed', 'green', shift=1)
 
-    def go(self):
+    def go(self) -> None:
         """ Execute finishing tasks """
         super().go()
 
@@ -85,7 +86,7 @@ class Finish(tmt.steps.Step):
         self.status('done')
         self.save()
 
-    def requires(self):
+    def requires(self) -> List[str]:
         """
         Packages required by all enabled finish plugins
 
@@ -99,14 +100,14 @@ class Finish(tmt.steps.Step):
         return list(requires)
 
 
-class FinishPlugin(tmt.steps.Plugin):
+class FinishPlugin(tmt.steps.Plugin):  # type: ignore[misc]
     """ Common parent of finish plugins """
 
     # List of all supported methods aggregated from all plugins
     _supported_methods = []
 
     @classmethod
-    def base_command(cls, method_class=None, usage=None):
+    def base_command(cls, method_class: Optional[str] = None, usage: Optional[str] = None) -> Any:
         """ Create base click command (common for all finish plugins) """
 
         # Prepare general usage message for the step

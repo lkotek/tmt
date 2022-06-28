@@ -3,17 +3,17 @@
 """ Common options and the MethodCommand class """
 
 import re
-from typing import Any, Callable, cast, Dict, List, Type
+from typing import Any, Callable, Dict, List, Type
 
 import click
 
 import tmt.utils
 
-MethodDictType = Dict[str, click.core.Command]
+MethodDictType = Dict[str, click.Command]
 # Originating in click.decorators, an opaque type describing "decorator" functions
 # produced by click.option() calls: not options, but rather functions that attach
 # options to a given command.
-ClickOptionDecoratorType = Callable[[click.Command], click.Command]
+ClickOptionDecoratorType = Callable[[Callable[..., Any]], Callable[..., Any]]
 
 # Verbose, debug and quiet output
 verbose_debug_quiet: List[ClickOptionDecoratorType] = [

@@ -5,6 +5,7 @@
 import os
 import subprocess
 import sys
+from typing import Any, Callable, List, Optional
 
 import click
 import fmf
@@ -32,11 +33,11 @@ tmt.plugins.explore()
 class CustomGroup(click.Group):
     """ Custom Click Group """
 
-    def list_commands(self, context):
+    def list_commands(self, context: click.core.Context) -> List[str]:
         """ Prevent alphabetical sorting """
-        return self.commands.keys()
+        return list(self.commands.keys())
 
-    def get_command(self, context, cmd_name):
+    def get_command(self, context: click.core.Context, cmd_name: str) -> Optional[click.Command]:
         """ Allow command shortening """
         # Backward-compatible 'test convert' (just temporary for now FIXME)
         cmd_name = cmd_name.replace('convert', 'import')
@@ -53,31 +54,32 @@ class CustomGroup(click.Group):
             return click.Group.get_command(self, context, matches[0])
         context.fail('Did you mean {}?'.format(
             listed(sorted(matches), join='or')))
+        return None
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #  Common Options
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def verbose_debug_quiet(function):
+def verbose_debug_quiet(function: Callable[..., Any]) -> Callable[..., Any]:
     """ Verbose, debug and quiet output """
     for option in reversed(tmt.options.verbose_debug_quiet):
         function = option(function)
     return function
 
 
-def force_dry(function):
+def force_dry(function: Callable[..., Any]) -> Callable[..., Any]:
     """ Force and dry actions """
     for option in reversed(tmt.options.force_dry):
         function = option(function)
     return function
 
 
-def fix(function):
+def fix(function: Callable[..., Any]) -> Callable[..., Any]:
     return tmt.options.fix(function)
 
 
-def name_filter_condition(function):
+def name_filter_condition(function: Callable[..., Any]) -> Callable[..., Any]:
     """ Common filter options (short & long) """
     options = [
         click.argument(
@@ -102,7 +104,7 @@ def name_filter_condition(function):
     return function
 
 
-def name_filter_condition_long(function):
+def name_filter_condition_long(function: Callable[..., Any]) -> Callable[..., Any]:
     """ Common filter options (long only) """
     options = [
         click.argument(
@@ -127,7 +129,7 @@ def name_filter_condition_long(function):
     return function
 
 
-def implemented_verified_documented(function):
+def implemented_verified_documented(function: Callable[..., Any]) -> Callable[..., Any]:
     """ Common story options """
 
     options = [
@@ -172,7 +174,7 @@ def implemented_verified_documented(function):
     '-r', '--root', metavar='PATH', show_default=True,
     help="Path to the tree root, '.' by default.")
 @click.option(
-    '-c', '--context', metavar='DATA', multiple='True',
+    '-c', '--context', metavar='DATA', multiple=True,
     help='Set the fmf context. Use KEY=VAL or KEY=VAL1,VAL2... format '
          'to define individual dimensions or the @FILE notation to load data '
          'from provided yaml file. Can be specified multiple times. ')
@@ -180,7 +182,11 @@ def implemented_verified_documented(function):
 @click.option(
     '--version', is_flag=True,
     help='Show tmt version and commit hash.')
-def main(click_contex, root, context, **kwargs):
+def main(
+        click_contex: click.core.Context,
+        root: str,
+        context: tmt.utils.FmfContextType,
+        **kwargs: Any) -> None:
     """ Test Management Tool """
     # Show current tmt version and exit
     if kwargs.get('version'):
@@ -194,13 +200,16 @@ def main(click_contex, root, context, **kwargs):
     # Save click context and fmf context for future use
     tmt.utils.Common._save_context(click_contex)
     click_contex.obj = tmt.utils.Common()
+    # TODO: needs check
     click_contex.obj.fmf_context = tmt.utils.context_to_dict(context)
 
     # Initialize metadata tree (from given path or current directory)
     tree = tmt.Tree(root or os.curdir)
+    # TODO: needs check
     click_contex.obj.tree = tree
 
     # List of enabled steps
+    # TODO: needs check
     click_contex.obj.steps = set()
 
     # Show overview of available tests, plans and stories
@@ -247,16 +256,16 @@ def main(click_contex, root, context, **kwargs):
     '-S', '--skip', type=click.Choice(tmt.steps.STEPS), metavar='STEP',
     help='Skip given step(s) during test run execution.', multiple=True)
 @click.option(
-    '-e', '--environment', metavar='KEY=VALUE|@FILE', multiple='True',
+    '-e', '--environment', metavar='KEY=VALUE|@FILE', multiple=True,
     help='Set environment variable. Can be specified multiple times. The '
          '"@" prefix marks a file to load (yaml or dotenv formats supported).')
 @click.option(
-    '--environment-file', metavar='FILE|URL', multiple='True',
+    '--environment-file', metavar='FILE|URL', multiple=True,
     help='Set environment variables from file or url (yaml or dotenv formats '
          'are supported). Can be specified multiple times.')
 @verbose_debug_quiet
 @force_dry
-def run(context, id_, **kwargs):
+def run(context: click.core.Context, id_: str, **kwargs: Any) -> None:
     """ Run test steps. """
     # Initialize
     run = tmt.Run(id_, context.obj.tree, context=context)
@@ -293,7 +302,7 @@ run.add_command(tmt.steps.Reboot.command())
     '--default', is_flag=True,
     help="Use default plans even if others are available.")
 @verbose_debug_quiet
-def run_plans(context, **kwargs):
+def run_plans(context: click.core.Context, **kwargs: Any) -> None:
     """
     Select plans which should be executed.
 
@@ -319,7 +328,7 @@ def run_plans(context, **kwargs):
     help="Filter by linked objects (regular expressions are "
          "supported for both relation and target).")
 @verbose_debug_quiet
-def run_tests(context, **kwargs):
+def run_tests(context: click.core.Context, **kwargs: Any) -> None:
     """
     Select tests which should be executed.
 
@@ -338,9 +347,10 @@ if callback is None:
     callback = run.resultcallback
 
 
+# TODO: commands is unknown, needs revisit
 @callback()
 @click.pass_context
-def finito(click_context, commands, *args, **kwargs):
+def finito(click_context: click.core.Context, commands: Any, *args: Any, **kwargs: Any) -> None:
     """ Run tests if run defined """
     if hasattr(click_context.obj, 'run'):
         click_context.obj.run.go()
@@ -353,7 +363,7 @@ def finito(click_context, commands, *args, **kwargs):
 @main.group(invoke_without_command=True, cls=CustomGroup)
 @click.pass_context
 @verbose_debug_quiet
-def tests(context, **kwargs):
+def tests(context: click.core.Context, **kwargs: Any) -> None:
     """
     Manage tests (L1 metadata).
 
@@ -370,7 +380,7 @@ def tests(context, **kwargs):
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def tests_ls(context, **kwargs):
+def tests_ls(context: click.core.Context, **kwargs: Any) -> None:
     """
     List available tests.
 
@@ -386,7 +396,7 @@ def tests_ls(context, **kwargs):
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def tests_show(context, **kwargs):
+def tests_show(context: click.core.Context, **kwargs: Any) -> None:
     """
     Show test details.
 
@@ -404,7 +414,7 @@ def tests_show(context, **kwargs):
 @name_filter_condition
 @fix
 @verbose_debug_quiet
-def tests_lint(context, **kwargs):
+def tests_lint(context: click.core.Context, **kwargs: Any) -> None:
     """
     Check tests against the L1 metadata specification.
 
@@ -412,7 +422,7 @@ def tests_lint(context, **kwargs):
     Use '.' to select tests under the current working directory.
     """
     # FIXME: Workaround https://github.com/pallets/click/pull/1840 for click 7
-    context.params.update(kwargs)
+    context.params.update(**kwargs)
     tmt.Test._save_context(context)
     exit_code = 0
     for test in context.obj.tree.tests():
@@ -434,7 +444,12 @@ _test_templates = listed(tmt.templates.TEST, join='or')
     prompt='Template ({})'.format(_test_templates))
 @verbose_debug_quiet
 @force_dry
-def tests_create(context, name, template, force, **kwargs):
+def tests_create(
+        context: click.core.Context,
+        name: str,
+        template: str,
+        force: bool,
+        **kwargs: Any) -> None:
     """
     Create a new test based on given template.
 
@@ -487,8 +502,20 @@ def tests_create(context, name, template, force, **kwargs):
 @verbose_debug_quiet
 @force_dry
 def tests_import(
-        context, paths, makefile, restraint, general, types, nitrate, purpose,
-        disabled, manual, plan, case, with_script, **kwargs):
+        context: click.core.Context,
+        paths: List[str],
+        makefile: bool,
+        restraint: bool,
+        general: bool,
+        types: List[str],
+        nitrate: bool,
+        purpose: bool,
+        disabled: bool,
+        manual: bool,
+        plan: str,
+        case: str,
+        with_script: bool,
+        **kwargs: Any) -> None:
     """
     Import old test metadata into the new fmf format.
 
@@ -512,7 +539,7 @@ def tests_import(
                 "Option --case or --plan is mandatory when using --manual.")
         else:
             tmt.convert.read_manual(plan, case, disabled, with_script)
-            return 0
+            return
 
     if not paths:
         paths = ['.']
@@ -579,7 +606,12 @@ def tests_import(
 @click.option(
     '-d', '--debug', is_flag=True,
     help='Provide as much debugging details as possible.')
-def tests_export(context, format_, nitrate, bugzilla, **kwargs):
+def tests_export(
+        context: click.core.Context,
+        format_: str,
+        nitrate: bool,
+        bugzilla: bool,
+        **kwargs: Any) -> None:
     """
     Export test data into the desired format.
 
@@ -615,7 +647,7 @@ def tests_export(context, format_, nitrate, bugzilla, **kwargs):
 @name_filter_condition
 @verbose_debug_quiet
 @force_dry
-def tests_id(context, **kwargs):
+def tests_id(context: click.core.Context, **kwargs: Any) -> None:
     """
     Generate a unique id for each selected test.
 
@@ -635,7 +667,7 @@ def tests_id(context, **kwargs):
 @main.group(invoke_without_command=True, cls=CustomGroup)
 @click.pass_context
 @verbose_debug_quiet
-def plans(context, **kwargs):
+def plans(context: click.core.Context, **kwargs: Any) -> None:
     """
     Manage test plans (L2 metadata).
 
@@ -654,7 +686,7 @@ def plans(context, **kwargs):
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def plans_ls(context, **kwargs):
+def plans_ls(context: click.core.Context, **kwargs: Any) -> None:
     """
     List available plans.
 
@@ -670,7 +702,7 @@ def plans_ls(context, **kwargs):
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def plans_show(context, **kwargs):
+def plans_show(context: click.core.Context, **kwargs: Any) -> None:
     """
     Show plan details.
 
@@ -687,7 +719,7 @@ def plans_show(context, **kwargs):
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def plans_lint(context, **kwargs):
+def plans_lint(context: click.core.Context, **kwargs: Any) -> None:
     """
     Check plans against the L2 metadata specification.
 
@@ -695,7 +727,7 @@ def plans_lint(context, **kwargs):
     Use '.' to select plans under the current working directory.
     """
     # FIXME: Workaround https://github.com/pallets/click/pull/1840 for click 7
-    context.params.update(kwargs)
+    context.params.update(**kwargs)
     tmt.Plan._save_context(context)
     exit_code = 0
     for plan in context.obj.tree.plans():
@@ -735,7 +767,12 @@ _plan_templates = listed(tmt.templates.PLAN, join='or')
     help='Finish phase content in yaml format.')
 @verbose_debug_quiet
 @force_dry
-def plans_create(context, name, template, force, **kwargs):
+def plans_create(
+        context: click.core.Context,
+        name: str,
+        template: str,
+        force: bool,
+        **kwargs: Any) -> None:
     """ Create a new plan based on given template. """
     tmt.Plan._save_context(context)
     tmt.Plan.create(name, template, context.obj.tree.root, force)
@@ -750,7 +787,7 @@ def plans_create(context, name, template, force, **kwargs):
 @click.option(
     '-d', '--debug', is_flag=True,
     help='Provide as much debugging details as possible.')
-def plans_export(context, format_, **kwargs):
+def plans_export(context: click.core.Context, format_: str, **kwargs: Any) -> None:
     """
     Export plans into desired format.
 
@@ -775,7 +812,7 @@ def plans_export(context, format_, **kwargs):
 @name_filter_condition
 @verbose_debug_quiet
 @force_dry
-def plans_id(context, **kwargs):
+def plans_id(context: click.core.Context, **kwargs: Any) -> None:
     """
     Generate a unique id for each selected plan.
 
@@ -795,7 +832,7 @@ def plans_id(context, **kwargs):
 @main.group(invoke_without_command=True, cls=CustomGroup)
 @click.pass_context
 @verbose_debug_quiet
-def stories(context, **kwargs):
+def stories(context: click.core.Context, **kwargs: Any) -> None:
     """
     Manage user stories.
 
@@ -816,8 +853,16 @@ def stories(context, **kwargs):
 @implemented_verified_documented
 @verbose_debug_quiet
 def stories_ls(
-        context, implemented, verified, documented, covered,
-        unimplemented, unverified, undocumented, uncovered, **kwargs):
+        context: click.core.Context,
+        implemented: bool,
+        verified: bool,
+        documented: bool,
+        covered: bool,
+        unimplemented: bool,
+        unverified: bool,
+        undocumented: bool,
+        uncovered: bool,
+        **kwargs: Any) -> None:
     """
     List available stories.
 
@@ -837,8 +882,16 @@ def stories_ls(
 @implemented_verified_documented
 @verbose_debug_quiet
 def stories_show(
-        context, implemented, verified, documented, covered,
-        unimplemented, unverified, undocumented, uncovered, **kwargs):
+        context: click.core.Context,
+        implemented: bool,
+        verified: bool,
+        documented: bool,
+        covered: bool,
+        unimplemented: bool,
+        unverified: bool,
+        undocumented: bool,
+        uncovered: bool,
+        **kwargs: Any) -> None:
     """
     Show story details.
 
@@ -865,7 +918,12 @@ _story_templates = listed(tmt.templates.STORY, join='or')
     help='Story template ({}).'.format(_story_templates))
 @verbose_debug_quiet
 @force_dry
-def stories_create(context, name, template, force, **kwargs):
+def stories_create(
+        context: click.core.Context,
+        name: str,
+        template: str,
+        force: bool,
+        **kwargs: Any) -> None:
     """ Create a new story based on given template. """
     tmt.Story._save_context(context)
     tmt.base.Story.create(name, template, context.obj.tree.root, force)
@@ -883,9 +941,19 @@ def stories_create(context, name, template, force, **kwargs):
 @implemented_verified_documented
 @verbose_debug_quiet
 def stories_coverage(
-        context, code, test, docs,
-        implemented, verified, documented, covered,
-        unimplemented, unverified, undocumented, uncovered, **kwargs):
+        context: click.core.Context,
+        code: bool,
+        test: bool,
+        docs: bool,
+        implemented: bool,
+        verified: bool,
+        documented: bool,
+        covered: bool,
+        unimplemented: bool,
+        unverified: bool,
+        undocumented: bool,
+        uncovered: bool,
+        **kwargs: Any) -> None:
     """
     Show code, test and docs coverage for given stories.
 
@@ -894,7 +962,7 @@ def stories_coverage(
     """
     tmt.Story._save_context(context)
 
-    def headfoot(text):
+    def headfoot(text: str) -> None:
         """ Format simple header/footer """
         echo(style(text.rjust(4) + ' ', fg='blue'), nl=False)
 
@@ -949,9 +1017,17 @@ def stories_coverage(
     '-d', '--debug', is_flag=True,
     help='Provide as much debugging details as possible.')
 def stories_export(
-        context, format_,
-        implemented, verified, documented, covered,
-        unimplemented, unverified, undocumented, uncovered, **kwargs):
+        context: click.core.Context,
+        format_: str,
+        implemented: bool,
+        verified: bool,
+        documented: bool,
+        covered: bool,
+        unimplemented: bool,
+        unverified: bool,
+        undocumented: bool,
+        uncovered: bool,
+        **kwargs: Any) -> None:
     """
     Export selected stories into desired format.
 
@@ -970,7 +1046,7 @@ def stories_export(
 @click.pass_context
 @name_filter_condition
 @verbose_debug_quiet
-def stories_lint(context, **kwargs):
+def stories_lint(context: click.core.Context, **kwargs: Any) -> None:
     """
     Check stories against the L3 metadata specification.
 
@@ -978,7 +1054,7 @@ def stories_lint(context, **kwargs):
     Use '.' to select stories under the current working directory.
     """
     # FIXME: Workaround https://github.com/pallets/click/pull/1840 for click 7
-    context.params.update(kwargs)
+    context.params.update(**kwargs)
     tmt.Story._save_context(context)
     exit_code = 0
     for story in context.obj.tree.stories():
@@ -994,8 +1070,17 @@ def stories_lint(context, **kwargs):
 @implemented_verified_documented
 @verbose_debug_quiet
 @force_dry
-def stories_id(context, implemented, verified, documented, covered,
-               unimplemented, unverified, undocumented, uncovered, **kwargs):
+def stories_id(
+        context: click.core.Context,
+        implemented: bool,
+        verified: bool,
+        documented: bool,
+        covered: bool,
+        unimplemented: bool,
+        unverified: bool,
+        undocumented: bool,
+        uncovered: bool,
+        **kwargs: Any) -> None:
     """
     Generate a unique id for each selected story.
 
@@ -1024,7 +1109,12 @@ def stories_id(context, implemented, verified, documented, covered,
         listed(tmt.templates.INIT_TEMPLATES, join='or')))
 @verbose_debug_quiet
 @force_dry
-def init(context, path, template, force, **kwargs):
+def init(
+        context: click.core.Context,
+        path: str,
+        template: str,
+        force: bool,
+        **kwargs: Any) -> None:
     """
     Initialize a new tmt tree.
 
@@ -1064,7 +1154,13 @@ def init(context, path, template, force, **kwargs):
     '--finished', is_flag=True, default=False,
     help='List all runs which have all enabled steps completed.')
 @verbose_debug_quiet
-def status(context, path, abandoned, active, finished, **kwargs):
+def status(
+        context: click.core.Context,
+        path: str,
+        abandoned: bool,
+        active: bool,
+        finished: bool,
+        **kwargs: Any) -> None:
     """
     Show status of runs.
 
@@ -1099,7 +1195,7 @@ dry = tmt.options.force_dry[1]
 @click.pass_context
 @verbose_debug_quiet
 @dry
-def clean(context, **kwargs):
+def clean(context: click.core.Context, **kwargs: Any) -> None:
     """
     Clean workdirs, guests or images.
 
@@ -1144,7 +1240,13 @@ def clean(context, **kwargs):
     help='The number of latest workdirs to keep, clean the rest.')
 @verbose_debug_quiet
 @dry
-def clean_runs(context, path, last, id_, keep, **kwargs):
+def clean_runs(
+        context: click.core.Context,
+        path: str,
+        last: bool,
+        id_: str,
+        keep: int,
+        **kwargs: Any) -> None:
     """
     Clean workdirs of past runs.
 
@@ -1179,7 +1281,12 @@ def clean_runs(context, path, last, id_, keep, **kwargs):
     help='Stop guests of the specified provision method.')
 @verbose_debug_quiet
 @dry
-def clean_guests(context, path, last, id_, **kwargs):
+def clean_guests(
+        context: click.core.Context,
+        path: str,
+        last: bool,
+        id_: int,
+        **kwargs: Any) -> None:
     """
     Stop running guests of runs.
 
@@ -1202,7 +1309,7 @@ def clean_guests(context, path, last, id_, **kwargs):
 @click.pass_context
 @verbose_debug_quiet
 @dry
-def clean_images(context, **kwargs):
+def clean_images(context: click.core.Context, **kwargs: Any) -> None:
     """
     Remove images of supported provision methods.
 
@@ -1225,7 +1332,7 @@ def clean_images(context, **kwargs):
 @name_filter_condition
 @fix
 @verbose_debug_quiet
-def lint(context, **kwargs):
+def lint(context: click.core.Context, **kwargs: Any) -> None:
     """
     Check all the present metadata against the specification.
 
@@ -1251,7 +1358,7 @@ def lint(context, **kwargs):
 
 @main.group(cls=CustomGroup)
 @click.pass_context
-def setup(context, **kwargs):
+def setup(context: click.core.Context, **kwargs: Any) -> None:
     """
     Setup the environment for working with tmt.
     """
@@ -1259,7 +1366,7 @@ def setup(context, **kwargs):
 
 @setup.group(cls=CustomGroup)
 @click.pass_context
-def completion(context, **kwargs):
+def completion(context: click.core.Context, **kwargs: Any) -> None:
     """
     Setup shell completions.
 
@@ -1274,7 +1381,7 @@ COMPLETE_VARIABLE = '_TMT_COMPLETE'
 COMPLETE_SCRIPT = 'tmt-complete'
 
 
-def setup_completion(shell, install):
+def setup_completion(shell: str, install: bool) -> None:
     """ Setup completion based on the shell """
     config = tmt.utils.Config()
     # Fish gets installed into its special location where it is automatically
@@ -1305,7 +1412,7 @@ def setup_completion(shell, install):
     '--install', '-i', 'install', is_flag=True,
     help="Persistently store the script to tmt's configuration directory "
          "and set it up by modifying '~/.bashrc'.")
-def completion_bash(context, install, **kwargs):
+def completion_bash(context: click.core.Context, install: bool, **kwargs: Any) -> None:
     """
     Setup shell completions for bash.
     """
@@ -1318,7 +1425,7 @@ def completion_bash(context, install, **kwargs):
     '--install', '-i', 'install', is_flag=True,
     help="Persistently store the script to tmt's configuration directory "
          "and set it up by modifying '~/.zshrc'.")
-def completion_zsh(context, install, **kwargs):
+def completion_zsh(context: click.core.Context, install: bool, **kwargs: Any) -> None:
     """
     Setup shell completions for zsh.
     """
@@ -1331,7 +1438,7 @@ def completion_zsh(context, install, **kwargs):
     '--install', '-i', 'install', is_flag=True,
     help="Persistently store the script to "
          "'~/.config/fish/completions/tmt.fish'.")
-def completion_fish(context, install, **kwargs):
+def completion_fish(context: click.core.Context, install: bool, **kwargs: Any) -> None:
     """
     Setup shell completions for fish.
     """

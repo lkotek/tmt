@@ -3,7 +3,8 @@
 
 import re
 import sys
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type,
+                    Union, cast)
 
 if sys.version_info >= (3, 8):
     from typing import TypedDict
@@ -412,17 +413,18 @@ class Plugin(Phase, metaclass=PluginIndex):
     def options(cls, how: Optional[str] = None) -> List[tmt.options.ClickOptionDecoratorType]:
         """ Prepare command line options for given method """
         # Include common options supported across all plugins
+        # TODO: remove type ignore later
         return tmt.options.verbose_debug_quiet + tmt.options.force_dry
 
     @classmethod
-    def command(cls) -> click.Command:
+    def command(cls) -> Callable[..., Any]:
         """ Prepare click command for all supported methods """
         # Create one command for each supported method
-        commands: Dict[str, click.Command] = {}
+        commands: Dict[str, Callable[..., Any]] = {}
         method_overview: str = f'Supported methods ({cls.how} by default):\n\n\b'
         for method in cls.methods():
             method_overview += f'\n{method.describe()}'
-            command: click.Command = cls.base_command(usage=method.usage())
+            command: Callable[..., Any] = cls.base_command(usage=method.usage())
             # Apply plugin specific options
             for option in method.class_.options(method.name):
                 command = option(command)

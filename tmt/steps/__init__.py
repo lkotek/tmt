@@ -3,7 +3,8 @@
 
 import re
 import sys
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union, cast
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Type, TypeVar,
+                    Union, cast, overload)
 
 if sys.version_info >= (3, 8):
     from typing import TypedDict
@@ -60,6 +61,10 @@ class Phase(tmt.utils.Common):
 
     def go(self, *args: Any, **kwargs: Any) -> None:
         """ Execute the phase """
+
+
+# A variable used to describe a generic type for all classes derived from Phase
+PhaseT = TypeVar('PhaseT', bound=Phase)
 
 
 class StepData(TypedDict, total=False):
@@ -260,8 +265,15 @@ class Step(tmt.utils.Common):
                 f"with order '{reboot_plugin.order}'.", level=2)
             self._phases.append(reboot_plugin)
 
-    def phases(
-            self, classes: Any = None) -> List[Phase]:
+    @overload
+    def phases(self, classes: Type[PhaseT]) -> List[PhaseT]:
+        pass
+
+    @overload
+    def phases(self, classes: None = None) -> List[Phase]:
+        pass
+
+    def phases(self, classes: Optional[Type[PhaseT]] = None) -> Union[List[Phase], List[PhaseT]]:
         """
         Iterate over phases by their order
 
@@ -402,7 +414,7 @@ class Plugin(Phase, metaclass=PluginIndex):
         self.step = step
 
     @classmethod
-    def base_command(cls, method_class: Optional[Method] = None,
+    def base_command(cls, method_class: Optional[Type[click.Command]] = None,
                      usage: Optional[str] = None) -> click.Command:
         """ Create base click command (common for all step plugins) """
         raise NotImplementedError
@@ -432,7 +444,7 @@ class Plugin(Phase, metaclass=PluginIndex):
             commands[method.name] = command
 
         # Create base command with common options using method class
-        method_class: Method = tmt.options.create_method_class(commands)
+        method_class: Type[click.Command] = tmt.options.create_method_class(commands)
         command = cls.base_command(
             method_class, usage=method_overview)
         # Apply common options

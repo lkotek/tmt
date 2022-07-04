@@ -1,6 +1,8 @@
 import os
 import os.path
+import types
 import webbrowser
+from typing import Any, List, Optional, cast
 
 import click
 import pkg_resources
@@ -11,8 +13,10 @@ import tmt.steps.report
 HTML_TEMPLATE_PATH = pkg_resources.resource_filename(
     'tmt', 'steps/report/html/template.html.j2')
 
+jinja2: Optional[types.ModuleType] = None
 
-def import_jinja2():
+
+def import_jinja2() -> None:
     """
     Import jinja2 module only when needed
 
@@ -44,19 +48,20 @@ class ReportHtml(tmt.steps.report.ReportPlugin):
     _keys = ["open"]
 
     @classmethod
-    def options(cls, how=None):
+    def options(cls, how: Optional[str] = None) -> List[click.Option]:
         """ Prepare command line options for the html report """
         return [
-            click.option(
+            cast(click.Option, click.option(
                 '-o', '--open', is_flag=True,
-                help='Open results in your preferred web browser.'),
+                help='Open results in your preferred web browser.')),
             ] + super().options(how)
 
-    def go(self):
+    def go(self, *args: Any, **kwargs: Any) -> None:
         """ Process results """
         super().go()
 
         import_jinja2()
+        assert jinja2
 
         # Prepare the template
         environment = jinja2.Environment()
@@ -80,6 +85,7 @@ class ReportHtml(tmt.steps.report.ReportPlugin):
             return
 
         # Show output file path
+        assert self.workdir is not None
         target = os.path.join(self.workdir, filename)
         self.info("output", target, color='yellow')
         if not self.get('open'):

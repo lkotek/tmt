@@ -11,6 +11,7 @@ import tmt.utils
 from tmt.base import Result, Test
 from tmt.steps.execute import TEST_OUTPUT_FILENAME, Script
 from tmt.steps.provision import Guest
+from tmt.utils import EnvironmentType
 
 # Script handling reboots, in restraint compatible fashion
 TMT_REBOOT_SCRIPT = Script("/usr/local/bin/tmt-reboot",
@@ -58,6 +59,7 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
         self._previous_progress_message = ""
         self.scripts = SCRIPTS
 
+    # TODO: fix types once superclass gains its annotations
     @classmethod
     def options(cls, how: Optional[str] = None) -> Any:
         """ Prepare command line options for given method """
@@ -85,7 +87,7 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
 
     # TODO: consider switching to utils.updatable_message() - might need more
     # work, since use of _show_progress is split over several methods.
-    def _show_progress(self, progress: Any, test_name: str,
+    def _show_progress(self, progress: str, test_name: str,
                        finish: Optional[bool] = False) -> None:
         """
         Show an interactive progress bar in non-verbose mode.
@@ -123,7 +125,7 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
             self._previous_progress_message = ""
         sys.stdout.flush()
 
-    def _test_environment(self, test: Test, extra_environment: Dict[str, Any]) -> Dict[str, Any]:
+    def _test_environment(self, test: Test, extra_environment: Dict[str, Any]) -> EnvironmentType:
         """ Return test environment """
         data_directory = self.data_path(test, full=True, create=True)
 
@@ -147,7 +149,7 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
 
         return environment
 
-    def execute(self, test: Test, guest: Guest, progress: Any,
+    def execute(self, test: Test, guest: Guest, progress: str,
                 extra_environment: Dict[str, Any]) -> None:
         """ Run test on the guest """
         # Provide info/debug message
@@ -203,7 +205,7 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
         self.verbose(
             f"{duration} {test.name} [{progress}]{timeout}", shift=shift)
 
-    def check(self, test: Test) -> Any:
+    def check(self, test: Test) -> Result:
         """ Check the test result """
         self.debug(f"Check result of '{test.name}'.")
         if test.framework == 'beakerlib':
@@ -313,11 +315,11 @@ class ExecuteInternal(tmt.steps.execute.ExecutePlugin):  # type: ignore[misc]
         self.debug("Pull the plan data directory.", level=2)
         guest.pull(source=self.step.plan.data_directory)
 
-    def results(self) -> List[Any]:
+    def results(self) -> List[Result]:
         """ Return test results """
         return self._results
 
-    def requires(self) -> Any:
+    def requires(self) -> List[str]:
         """ Return list of required packages """
         # FIXME Remove when we drop support for the old execution methods
         return ['beakerlib'] if self.step._framework == 'beakerlib' else []

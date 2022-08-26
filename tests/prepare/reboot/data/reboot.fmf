@@ -1,0 +1,9 @@
+provision:
+    how: virtual
+prepare:
+  - name: Run reboot script
+    how: reboot
+    script: ./reboot.sh
+execute:
+    how: tmt
+    script: echo "REBOOTED"
